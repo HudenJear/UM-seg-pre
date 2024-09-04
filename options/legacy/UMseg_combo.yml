@@ -1,0 +1,163 @@
+# general settings
+name: UMCDImmComboDummy_ex1
+model_type: ComboModel
+num_gpu: 1  # set num_gpu: 0 for cpu mode
+# manual_seed: 114514
+multitrain: true
+round: 3
+dataset_random_fetch: false
+# random_fetch_path: dataset/slo_label.csv
+# val_ratio: 0.05
+# if dataset_random_fetch is on, the csv_path would be disbaled in the train and val phase.
+# a new csv would be created and saved in the models folder
+
+
+# dataset and data loader settings
+datasets:
+  train:
+    name: UMsegTrain
+    type: ImagePairDataset
+    image_folder: ./UM_segment_dataset/train
+    csv_path: ./UM_segment_dataset/train/UM_label.csv
+
+    flip: true
+    crop: false
+    image_size: !!int 512
+    resize: true
+    fine_size: 512
+    augment_ratio: 1
+    # mean: [0.485, 0.456, 0.406]
+    # std: [0.229, 0.224, 0.225]
+
+    # data loader
+    use_shuffle: true
+    num_worker_per_gpu: 4
+    batch_size_per_gpu: 16
+    dataset_enlarge_ratio: 1
+    prefetch_mode: ~
+
+  val:
+    name: testUMseg
+    type: ImagePairDataset
+    image_folder: ./UM_segment_dataset/val
+    csv_path: ./UM_segment_dataset/val/UM_label.csv
+
+    flip: true
+    crop: false
+    image_size: !!int 512
+    resize: true
+    fine_size: 512
+    augment_ratio: 1
+    # mean: [0.485, 0.456, 0.406]
+    # std: [0.229, 0.224, 0.225]
+
+# network structures
+network_g:
+  type: UMSeg1
+  dim: 32
+  out_chan: 1
+  stage: 4
+  neck_blocks: 4
+  layer_scale_init_value: !!float 1e-5
+  use_bias: True
+
+network_d:
+  type: HyperSwin
+  img_size: 512
+  in_ch: 4
+  out_ch: 1
+  ffa_out_ch: 32
+  tn_in_ch: 512
+  hyper_in_ch: 512
+  embed_dim: 64
+  depths: [2, 4, 6, 2]
+  num_heads: [2, 4, 8, 16]
+  window_size: 16
+  drop_rate: 0.
+  attn_drop_rate: 0.
+  drop_path_rate: 0.1
+  
+
+# path
+path:
+  pretrain_network_g:
+  strict_load_g: false
+  resume_state: ~
+
+# training settings
+train:
+  ema_decay: 0.99
+  optim_g:
+    type: Adam
+    lr: !!float 1e-5
+    weight_decay: 0
+    betas: [0.9, 0.99]
+
+  optim_d: # aligned with net_d
+    type: Adam
+    lr: !!float 1e-5
+    weight_decay: 0
+    betas: [0.9, 0.99]
+
+  scheduler:
+    type: MultiStepLR
+    milestones: [8000, 15000, 30000, 60000]
+    gamma: 0.5
+
+  total_iter: 100000
+  warmup_iter: 500  # no warm up use -1
+
+  net_d_iters: 1   # train net_d ever x round
+  net_d_init_iters: 1000  # train net_g from x round
+
+  # losses
+  pixel_opt:
+    type: SmoothL1Loss
+    loss_weight: !!float 1
+    reduction: mean
+  net_d_opt: 
+    type: SmoothL1Loss
+    loss_weight: !!float 1
+    reduction: mean
+
+
+# validation settings
+val:
+  val_freq:  5000
+  suffix: seg
+  use_pbar: false
+  
+  save_img: true
+  metrics:
+    L1:
+      type: calculate_l1
+      better: lower
+    IOU:
+      type: calculate_IOU
+      better: higher
+    Dice:
+      type: calculate_Dice
+      better: higher
+  
+  save_prediction: true
+  iqa_metrics:
+    SRCC:
+      type: calculate_srcc
+      better: higher
+    PLCC:
+      type: calculate_plcc
+      better: higher
+    RMSE:
+      type: calculate_rmse
+      better: lower
+
+# logging settings
+logger:
+  print_freq: 1000
+  save_checkpoint_freq: 5000 # save point should be later than validation point 
+  save_best: true
+
+# dist training settings
+# dist_params:
+#   backend: nccl
+#   port: 29500

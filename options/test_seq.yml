@@ -1,0 +1,86 @@
+# general settings
+name: UMCDImmPred_test1
+model_type: SequentialModel
+num_gpu: 1  # set num_gpu: 0 for cpu mode
+manual_seed: 114514
+
+# dataset and data loader settings
+datasets:
+  test:
+    name: UMsegTest
+    type: ImagePairDataset
+    image_folder: ./UM_segment_dataset/test
+    csv_path: ./UM_segment_dataset/test/UM_label.csv
+
+    flip: false
+    crop: false
+    image_size: !!int 512
+    resize: true
+    fine_size: 512
+    augment_ratio: 1
+    # mean: [0.485, 0.456, 0.406]
+    # std: [0.229, 0.224, 0.225]
+
+# network structures
+network_g:
+  type: RRDB_Seg
+  dim: 32
+  stage: 4
+  out_chan: 1
+
+network_d:
+  type: SwinTransformer
+  img_size: 512
+  patch_size: 4
+  in_chans: 1
+  num_classes: 1 #
+  embed_dim: 64
+  depths: [2, 2, 6, 2]
+  num_heads: [4, 8, 16, 32]
+  window_size: 16 # windows here
+  mlp_ratio: 4.
+  qkv_bias: True
+  drop_rate: 0.
+  attn_drop_rate: 0.
+  drop_path_rate: 0.1
+  ape: False
+  patch_norm: True
+  use_checkpoint: False
+  sigmoid: False
+  
+
+# path
+path:
+  pretrain_network_g: experiments/UMCDImmPred_ex2(LOWER LR+SLOWER START)/models/0_net_g_50000.pth
+  pretrain_network_d: experiments/UMCDImmPred_ex2(LOWER LR+SLOWER START)/models/0_net_d_50000.pth
+  strict_load_g: true
+  resume_state: ~
+
+val:
+  suffix: CDImm
+  use_pbar: true
+
+  save_img: true
+  metrics:
+    L1:
+      type: calculate_l1
+      better: lower
+    IOU:
+      type: calculate_IOU
+      better: higher
+    Dice:
+      type: calculate_Dice
+      better: higher
+  
+  save_prediction: true
+  iqa_metrics:
+    SRCC:
+      type: calculate_srcc
+      better: higher
+    PLCC:
+      type: calculate_plcc
+      better: higher
+    RMSE:
+      type: calculate_rmse
+      better: lower
+
